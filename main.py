@@ -1,10 +1,16 @@
 from utils import SplashText, Text, Button
 
-import pygame
-import random
+import pygame, random, os
+
+from math import ceil
 from dataclasses import dataclass
 from typing import Dict, List
 
+
+@dataclass
+class Vector:
+    x: float
+    y: float
 
 @dataclass
 class Level:
@@ -18,7 +24,6 @@ class Colors:
     chequered0: tuple
     chequered1: tuple
     appleColor: tuple
-    snakeColor: tuple
     backColor : tuple
 
 
@@ -29,25 +34,26 @@ levels = {
     }
 LVL = list(levels.keys())[0]
 
-colors = {"green": Colors("green", (170, 215, 81), (155, 200, 73), (156, 50, 50), (17, 24, 47), (237, 246, 249))} 
+colors = {"green": Colors("green", (170, 215, 81), (155, 200, 73), (156, 50, 50), (237, 246, 249))} 
 THEME = "green"
 
 # region init
 pygame.init()
 
-GRIDSIZE = (15, 15)             # how many cells are in the grid
-CELLSIZE = 30                   # visual grid size
-fieldOffset = (100, 50)
+GRIDSIZE = Vector(15, 15)             # how many cells are in the grid
+CELLSIZE = 40
+fieldOffset = Vector(100, 50)
 
-screenX, screenY = (CELLSIZE*GRIDSIZE[0] + fieldOffset[0]*2, CELLSIZE*GRIDSIZE[1] + fieldOffset[1]*2)
+screenX, screenY = (CELLSIZE*GRIDSIZE.x + fieldOffset.x*2, CELLSIZE*GRIDSIZE.y + fieldOffset.y*2)
 screen = pygame.display.set_mode((screenX, screenY))
 pygame.display.set_caption("Snake")
 
 clock = pygame.time.Clock()
 
-scoreText = Text(position=(25, 30), color=(13, 13, 26), text="0", font=pygame.font.Font(None, 42))     # will display the current score
+fontSize = 38 - ceil(700/screenY)*2
+scoreText = Text(position=(25, 30), color=(13, 13, 26), text="0", fontSize=42)     # will display the current score
 
-splash = SplashText(screenX, screenY)                                                                  # will pop-up after you died
+splash = SplashText(screenX, screenY, fontSize=fontSize+20)  # will pop-up after you died
 splash.textColor = (156, 50, 50)
 splash.bgColor = colors[THEME].chequered1
 
@@ -69,11 +75,11 @@ class MainMenu:
         w, h = int(screenX/2), int(screenY/2)
         keys = list(levelDict.keys())
 
-        for i in range(len(keys)):
-            self.buttons[keys[i]] = Button(keys[i], ((screenX/150+50)*(len(keys)*(i+1)), screenY-150), 
-                                            (15, 6), text=keys[i], onClicked=self.choose)
+        self.buttons[keys[0]] = Button(keys[0], (w-int(screenX/4), screenY-150), (15, 6), text=keys[0], onClicked=self.choose, fontSize=fontSize)
+        self.buttons[keys[1]] = Button(keys[1], (w, screenY-150), (15, 6), text=keys[1], onClicked=self.choose, fontSize=fontSize)
+        self.buttons[keys[2]] = Button(keys[2], (w+int(screenX/4), screenY-150), (15, 6), text=keys[2], onClicked=self.choose, fontSize=fontSize)
 
-        self.titleText = Text((w, h), color=(255, 255, 255), text="Snake")
+        self.titleText = Text((w, h-50), color=(255, 255, 255), text="Snake", fontSize=fontSize+20)
     
     def choose(self, b: Button):
         global LVL
@@ -110,14 +116,37 @@ class Snake:
         self.positions = []
         self.snakeLength = 1
         self.dir = RIGHT
-        self.color = (17, 24, 47)
+        self.headSprite = self.loadHeadSprite()
+        self.bodySprite = self.loadBodySprite()
 
         self.moved = True
+        self.nearApple = False
+    
+    def loadHeadSprite(self):
+        # pygame.Surface((CELLSIZE, CELLSIZE))
+        idle = pygame.transform.scale(pygame.image.load(os.path.join("src", "snakeHead_idle.png")), (CELLSIZE, CELLSIZE))
+        eat = pygame.transform.scale(pygame.image.load(os.path.join("src", "snakeHead_eat.png")), (CELLSIZE, CELLSIZE))
+
+        return [idle, eat]
+    
+    def loadBodySprite(self):
+        return pygame.transform.scale(pygame.image.load(os.path.join("src", "snakeBody.png")), (CELLSIZE, CELLSIZE))
+
+    def animateMouth(self, radius: int):
+        self.nearApple = False
+        for apple in apples:
+            aPos = apple.position
+
+            if aPos[0] - (radius*CELLSIZE) <= self.positions[0][0] and aPos[0] + (radius*CELLSIZE) >= self.positions[0][0]:
+                if aPos[1] - (radius*CELLSIZE) <= self.positions[0][1] and aPos[1] + (radius*CELLSIZE) >= self.positions[0][1]:
+                    self.nearApple = True
 
     def turn(self, targetDir):
         if self.moved == False:
+
             return
 
+        # you cant move in the opposite direction you are currently moving in
         if self.snakeLength > 1 and (targetDir[0] * -1, targetDir[1] * -1) == self.dir:
             return
         else:
@@ -125,11 +154,12 @@ class Snake:
             self.moved = False
 
     def move(self):
+        # called before draw
         head = self.positions[0]
         newPos = ((head[0] + (self.dir[0]*CELLSIZE)), head[1] + (self.dir[1]*CELLSIZE))
 
         # test if collided with wall
-        if newPos[0] > screenX - CELLSIZE - fieldOffset[0] or newPos[0] < fieldOffset[0] or newPos[1] > screenY - CELLSIZE - fieldOffset[1] or newPos[1] < fieldOffset[1]:
+        if newPos[0] > screenX - CELLSIZE - fieldOffset.x or newPos[0] < fieldOffset.x or newPos[1] > screenY - CELLSIZE - fieldOffset.y or newPos[1] < fieldOffset.y:
             splash.loadInfo(f"You died! Score: {score}", "MENU", mainMenu.toggle)
             return
 
@@ -142,6 +172,8 @@ class Snake:
         self.positions.insert(0, newPos) # new head pos
         if len(self.positions) > self.snakeLength:
             self.positions.pop() # default last
+        
+        #self.animateMouth(2)
         self.moved = True
 
     def reset(self):
@@ -153,17 +185,32 @@ class Snake:
 
         score = 0
         self.snakeLength = 1
-        self.positions = [[0 * CELLSIZE + fieldOffset[0], int(GRIDSIZE[0]/2) * CELLSIZE + fieldOffset[1]]]
+        self.positions = [[0 * CELLSIZE + fieldOffset.x, int(GRIDSIZE.x/2) * CELLSIZE + fieldOffset.y]]
         self.dir = RIGHT
 
     def draw(self):
+        x = int(CELLSIZE/2)
+
         for body in self.positions:
-            r = pygame.Rect((body[0], body[1]), (CELLSIZE, CELLSIZE))
-            pygame.draw.rect(screen, self.color, r)
+            # head can rotate. (animation and vfx)
+            if body == self.positions[0]:
+                rot = min(self.dir[0]*180, 0) + self.dir[1]*-90
+                sprite = self.bodySprite # self.headSprite[0] if not self.nearApple else self.headSprite[1]
+
+                img = pygame.transform.rotate(sprite, rot)
+                rect = img.get_rect()
+
+                rect.center = (body[0]+x, body[1]+x)
+
+                screen.blit(img, rect)
+                continue
+
+            screen.blit(self.bodySprite, self.bodySprite.get_rect(center=(body[0]+x, body[1]+x)))
+
 
 class Apple:
     def __init__(self):
-        self.position = (random.randint(0, GRIDSIZE[0]-1) * CELLSIZE + fieldOffset[0], random.randint(0, GRIDSIZE[1]-1) * CELLSIZE + fieldOffset[1])
+        self.position = ()
         self.color = colors[THEME].appleColor
         self.random_pos()
     
@@ -175,7 +222,7 @@ class Apple:
 
         
         while True:
-            self.position = (random.randint(0, GRIDSIZE[0]-1) * CELLSIZE + fieldOffset[0], random.randint(0, GRIDSIZE[1]-1) * CELLSIZE + fieldOffset[1])
+            self.position = (random.randint(0, GRIDSIZE.x-1) * CELLSIZE + fieldOffset.x, random.randint(0, GRIDSIZE.y-1) * CELLSIZE + fieldOffset.y)
             if self.position not in snake.positions and self.position not in other:
                 break
 
@@ -185,9 +232,9 @@ class Apple:
 
 
 def drawGrid():
-    for y in range(0, GRIDSIZE[1]):
-        for x in range(0, GRIDSIZE[0]):
-            r = pygame.Rect((x*CELLSIZE + fieldOffset[0], y*CELLSIZE + fieldOffset[1]), (CELLSIZE, CELLSIZE))
+    for y in range(0, GRIDSIZE.y):
+        for x in range(0, GRIDSIZE.x):
+            r = pygame.Rect((x*CELLSIZE + fieldOffset.x, y*CELLSIZE + fieldOffset.y), (CELLSIZE, CELLSIZE))
 
             if (x+y) % 2 == 0:
                 pygame.draw.rect(screen, colors[THEME].chequered0, r)
@@ -197,7 +244,7 @@ def drawGrid():
 def draw():
     if mainMenu.isToggled == True or splash.isToggled == True:
         mainMenu.drawMenu(screen)
-        splash.update(screen)
+        splash.draw(screen)
         return
 
     screen.fill(colors[THEME].backColor)
@@ -213,10 +260,10 @@ def draw():
 def appleSpawn():
     global apples
     apples = []
-    for i in range(levels[LVL].appleCount):
+    for _ in range(levels[LVL].appleCount):
         apples.append(Apple())
 
-
+    
 score = 0
 snake = Snake()
 mainMenu = MainMenu(levels)
@@ -233,6 +280,7 @@ def main():
         if mainMenu.isToggled or splash.isToggled:
             clock.tick(20)
         else:
+            # the faster the tickspeed the harder the gfame
             clock.tick(levels[LVL].tickSpeed)
 
         # events
@@ -265,7 +313,7 @@ def main():
                     apple.random_pos()
             
             # check won
-            if snake.snakeLength == GRIDSIZE[0]*GRIDSIZE[1]:
+            if snake.snakeLength == GRIDSIZE.x*GRIDSIZE.y:
                 splash.loadInfo(f"You won! Score: {score}", "MENU", snake.reset)
             
         draw()

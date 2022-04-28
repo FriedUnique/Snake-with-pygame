@@ -50,9 +50,7 @@ class Button:
         w = self.scale[0] * 10
         h = self.scale[1] * 10
 
-        self.textPos = (x + w/2 - textW/2, y + h/2 - textH/2)
-
-        self.textPos = roundTupleValues(self.textPos)
+        return roundTupleValues((x + w/2 - textW/2, y + h/2 - textH/2))
 
     def draw(self, surface):
         if not self.isActive: return
@@ -82,7 +80,7 @@ class Button:
 
     def changeText(self, newText: str):
         self.text = newText
-        self.alignText()
+        self.textPos = self.alignText()
         self.txt_surface = self.font.render(self.text, True, self.textColor)
 
     def SetActive(self, activate):
