@@ -1,9 +1,14 @@
-from utils import roundTupleValues
-
 import pygame
 from enum import Enum
 
 pygame.init()
+
+def roundTupleValues(t: tuple):
+    ts = list(t)
+    for i in range(len(ts)):
+        ts[i] = round(ts[i])
+
+    return tuple(ts)
 
 
 class Button:

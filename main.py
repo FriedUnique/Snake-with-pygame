@@ -1,4 +1,4 @@
-from utils import SplashText, Text, Button
+from ui_utils import * # import my crap
 
 import pygame, random, os
 
@@ -39,18 +39,18 @@ THEME = "green"
 
 # region init
 pygame.init()
+clock = pygame.time.Clock()
 
-GRIDSIZE = Vector(15, 15)             # how many cells are in the grid
-CELLSIZE = 40
-fieldOffset = Vector(100, 50)
+GRIDSIZE = Vector(15, 15) # how many cells are in the grid
+CELLSIZE = 40 # actual size of the cell
+fieldOffset = Vector(100, 50) # padding/space between the "gameboard" and the window border
 
 screenX, screenY = (CELLSIZE*GRIDSIZE.x + fieldOffset.x*2, CELLSIZE*GRIDSIZE.y + fieldOffset.y*2)
 screen = pygame.display.set_mode((screenX, screenY))
 pygame.display.set_caption("Snake")
 
-clock = pygame.time.Clock()
 
-fontSize = 38 - ceil(700/screenY)*2
+fontSize = 38 - ceil(700/screenY)*2 # somewhat adaptive font scaler 
 scoreText = Text(position=(25, 30), color=(13, 13, 26), text="0", fontSize=42)     # will display the current score
 
 splash = SplashText(screenX, screenY, fontSize=fontSize+20)  # will pop-up after you died
@@ -65,6 +65,7 @@ RIGHT = (1, 0)
 
 #endregion
 
+#region classes
 class MainMenu:
     def __init__(self, levelDict: Dict[str, Level]):
         self.isToggled = True
@@ -124,13 +125,13 @@ class Snake:
     
     def loadHeadSprite(self):
         # pygame.Surface((CELLSIZE, CELLSIZE))
-        idle = pygame.transform.scale(pygame.image.load(os.path.join("src", "snakeHead_idle.png")), (CELLSIZE, CELLSIZE))
-        eat = pygame.transform.scale(pygame.image.load(os.path.join("src", "snakeHead_eat.png")), (CELLSIZE, CELLSIZE))
+        idle = pygame.transform.scale(pygame.image.load(os.path.join("images", "snakeHead_idle.png")), (CELLSIZE, CELLSIZE))
+        eat = pygame.transform.scale(pygame.image.load(os.path.join("images", "snakeHead_eat.png")), (CELLSIZE, CELLSIZE))
 
         return [idle, eat]
     
     def loadBodySprite(self):
-        return pygame.transform.scale(pygame.image.load(os.path.join("src", "snakeBody.png")), (CELLSIZE, CELLSIZE))
+        return pygame.transform.scale(pygame.image.load(os.path.join("images", "snakeBody.png")), (CELLSIZE, CELLSIZE))
 
     def animateMouth(self, radius: int):
         self.nearApple = False
@@ -141,9 +142,15 @@ class Snake:
                 if aPos[1] - (radius*CELLSIZE) <= self.positions[0][1] and aPos[1] + (radius*CELLSIZE) >= self.positions[0][1]:
                     self.nearApple = True
 
+    def handleInput(self):
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_UP] or keys[pygame.K_w]: self.turn(UP)
+        elif keys[pygame.K_DOWN] or keys[pygame.K_s]: self.turn(DOWN)
+        elif keys[pygame.K_LEFT] or keys[pygame.K_a]: self.turn(LEFT)
+        elif keys[pygame.K_RIGHT] or keys[pygame.K_d]: self.turn(RIGHT)
+
     def turn(self, targetDir):
         if self.moved == False:
-
             return
 
         # you cant move in the opposite direction you are currently moving in
@@ -207,7 +214,6 @@ class Snake:
 
             screen.blit(self.bodySprite, self.bodySprite.get_rect(center=(body[0]+x, body[1]+x)))
 
-
 class Apple:
     def __init__(self):
         self.position = ()
@@ -230,6 +236,7 @@ class Apple:
         r = pygame.Rect(self.position, (CELLSIZE, CELLSIZE))
         pygame.draw.rect(screen, self.color, r)
 
+#endregion
 
 def drawGrid():
     for y in range(0, GRIDSIZE.y):
@@ -256,7 +263,6 @@ def draw():
 
     scoreText.draw(screen)
 
-
 def appleSpawn():
     global apples
     apples = []
@@ -265,39 +271,30 @@ def appleSpawn():
 
     
 score = 0
-snake = Snake()
 mainMenu = MainMenu(levels)
+snake = Snake()
 apples: List[Apple] = []
 
 
 def main():
-    global splash, score, snake, mainMenu
+    global score, snake, mainMenu
 
     isRunning = True
-
     while isRunning:
         # switch tickspeed so UI is not slow.
         if mainMenu.isToggled or splash.isToggled:
             clock.tick(20)
         else:
-            # the faster the tickspeed the harder the gfame
+            # the faster the tickspeed the harder the game
             clock.tick(levels[LVL].tickSpeed)
+
 
         # events
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 isRunning = False
 
-            elif event.type == pygame.KEYDOWN:
-                # movement
-                if event.key == pygame.K_UP or event.key == pygame.K_w:
-                    snake.turn(UP)
-                elif event.key == pygame.K_DOWN or event.key == pygame.K_s:
-                    snake.turn(DOWN)
-                elif event.key == pygame.K_LEFT or event.key == pygame.K_a:
-                    snake.turn(LEFT)
-                elif event.key == pygame.K_RIGHT or event.key == pygame.K_d:
-                    snake.turn(RIGHT)
+        snake.handleInput()
 
 
         # draw and update
@@ -309,7 +306,7 @@ def main():
                 if snake.positions[0] == apple.position:
                     snake.snakeLength += 1
                     score += 1
-                    scoreText.changeText(str(score))
+                    scoreText.changeText(str(score)) # less power intense, than updating always
                     apple.random_pos()
             
             # check won
@@ -317,7 +314,6 @@ def main():
                 splash.loadInfo(f"You won! Score: {score}", "MENU", snake.reset)
             
         draw()
-
         mainMenu.update(screen)
         pygame.display.update()
 
